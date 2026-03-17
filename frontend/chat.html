@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <style>
+        .chat-message {
+            animation: slideIn 0.3s ease-out;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        th, td {
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+        }
+
+        th {
+            background: #f3f4f6;
+            text-align: left;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            background-color: #9CA3AF;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+        .chat-container {
+            height: calc(100vh - 320px);
+            min-height: 320px;
+        }
+        @media (min-width: 640px) {
+            .chat-container {
+                height: calc(100vh - 280px);
+                min-height: 400px;
+            }
+        }
+        .markdown-body h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        .markdown-body ul {
+            padding-left: 18px;
+            margin-top: 4px;
+        }
+        .markdown-body li {
+            margin-bottom: 2px;
+        }
+        .markdown-body table {
+            border-collapse: collapse;
+            margin-top: 6px;
+        }
+        .markdown-body td,
+        .markdown-body th {
+            border: 1px solid #ddd;
+            padding: 4px 8px;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-3 py-4 sm:px-4 sm:py-6 max-w-6xl">
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-2">
+                <i class="fas fa-robot text-blue-600"></i>
+                AI Chat Assistant
+            </h1>
+            <p class="text-gray-600">Chat với AI Assistant có khả năng tìm kiếm và trả lời thông tin</p>
+        </div>
+
+        <!-- Main Chat Container -->
+        <div class="bg-white rounded-lg shadow-xl overflow-hidden">
+            <!-- Login Section (Initial) -->
+            <div id="loginSection" class="p-5 sm:p-8">
+                <div class="max-w-md mx-auto">
+                    <div class="text-center mb-6">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4">
+                            <i class="fas fa-comments text-blue-600 text-3xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Bắt đầu cuộc trò chuyện</h2>
+                        <p class="text-gray-600">Nhập số điện thoại để bắt đầu chat với AI</p>
+                    </div>
+
+                    <form id="loginForm" class="space-y-4">
+                        <div>
+                            <label for="phoneNumber" class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-phone mr-2"></i>Số điện thoại
+                            </label>
+                            <input 
+                                type="tel" 
+                                id="phoneNumber" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="0123456789"
+                                required
+                            >
+                        </div>
+
+                        <div>
+                            <label for="firstQuestion" class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-comment-dots mr-2"></i>Câu hỏi đầu tiên
+                            </label>
+                            <textarea 
+                                id="firstQuestion" 
+                                rows="3" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                placeholder="Ví dụ: 5Sao là gì?"
+                                required
+                            ></textarea>
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            class="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center"
+                        >
+                            <i class="fas fa-paper-plane mr-2"></i>
+                            Bắt đầu chat
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Chat Section (Hidden Initially) -->
+            <div id="chatSection" class="hidden">
+                <!-- Chat Header -->
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 sm:p-4 flex items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+                            <i class="fas fa-robot text-blue-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold">AI Assistant</h3>
+                            <p class="text-sm text-blue-100">
+                                <span id="userPhone"></span>
+                            </p>
+                        </div>
+                    </div>
+                    <button id="newChatBtn" class="bg-white/20 hover:bg-white/30 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap">
+                        <i class="fas fa-plus mr-2"></i>Chat mới
+                    </button>
+                </div>
+
+                <!-- Messages Container -->
+                <div id="messagesContainer" class="chat-container overflow-y-auto p-3 sm:p-6 space-y-4 bg-gray-50">
+                    <!-- Messages will be added here dynamically -->
+                </div>
+
+                <!-- Input Area -->
+                <div class="border-t bg-white p-3 sm:p-4">
+                    <form id="messageForm" class="flex flex-col sm:flex-row gap-3">
+                        <textarea 
+                            id="messageInput" 
+                            rows="1" 
+                            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                            placeholder="Nhập câu hỏi của bạn..."
+                            required
+                        ></textarea>
+                        <button 
+                            type="submit" 
+                            id="sendBtn"
+                            class="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center sm:justify-start"
+                        >
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </form>
+                    <div class="mt-2 text-xs text-gray-500 flex items-start sm:items-center justify-between gap-2">
+                        <span>
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Conversation ID: <span id="conversationIdDisplay" class="font-mono">-</span>
+                        </span>
+                        <span id="messageCount" class="text-gray-400">0 tin nhắn</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Context Display (Optional - for debugging) -->
+        <div id="contextSection" class="mt-6 bg-white rounded-lg shadow-md p-6 hidden">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-database text-purple-600 mr-2"></i>
+                Retrieved Context
+            </h3>
+            <div id="contextDisplay" class="text-sm text-gray-600 max-h-40 overflow-y-auto bg-gray-50 p-4 rounded-lg font-mono">
+                No context yet
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-4 right-4 hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl p-4 min-w-[300px] border-l-4">
+            <div class="flex items-start">
+                <i id="toastIcon" class="text-2xl mr-3"></i>
+                <div class="flex-1">
+                    <h4 id="toastTitle" class="font-semibold text-gray-800"></h4>
+                    <p id="toastMessage" class="text-sm text-gray-600 mt-1"></p>
+                </div>
+                <button id="toastClose" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        // State Management
+        let currentConversationId = null;
+        let currentPhoneNumber = null;
+        let messageCount = 0;
+
+        // DOM Elements
+        const loginSection = document.getElementById('loginSection');
+        const chatSection = document.getElementById('chatSection');
+        const loginForm = document.getElementById('loginForm');
+        const messageForm = document.getElementById('messageForm');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const newChatBtn = document.getElementById('newChatBtn');
+        const userPhone = document.getElementById('userPhone');
+        const conversationIdDisplay = document.getElementById('conversationIdDisplay');
+        const messageCountDisplay = document.getElementById('messageCount');
+        const contextDisplay = document.getElementById('contextDisplay');
+        const contextSection = document.getElementById('contextSection');
+
+        // Parse URL Parameters
+        function getURLParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                phoneNumber: params.get('phoneNumber'),
+                conversationId: params.get('conversationId'),
+                hasMessages: params.get('hasMessages') === 'true'
+            };
+        }
+
+        // Initialize from URL using /chat/initial API
+        async function initializeFromURL() {
+            const urlParams = getURLParams();
+
+            if (urlParams.phoneNumber && urlParams.conversationId) {
+                try {
+                    currentPhoneNumber = urlParams.phoneNumber;
+                    currentConversationId = urlParams.conversationId;
+                    
+                    // Switch to chat view immediately
+                    loginSection.classList.add('hidden');
+                    chatSection.classList.remove('hidden');
+                    userPhone.textContent = currentPhoneNumber;
+                    conversationIdDisplay.textContent = currentConversationId;
+
+                    // If URL indicates there are messages, load them
+                    if (urlParams.hasMessages) {
+                        showToast('Đang tải', 'Đang tải lịch sử tin nhắn...', 'info');
+                        
+                        const response = await fetch(`${API_BASE_URL}/chat/initial`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                phoneNumber: currentPhoneNumber
+                            })
+                        });
+
+                        const result = await response.json();
+
+                        if (result.success && result.data.messages.length > 0) {
+                            // Clear messages container
+                            messagesContainer.innerHTML = '';
+                            messageCount = 0;
+
+                    // Add each message to UI
+                            result.data.messages.forEach(msg => {
+                                console.log('Loading historical message:', msg);
+                                addMessage(msg.content, msg.role, null, true, msg.actions || []);
+                            });
+
+                            showToast('Thành công', `Đã tải ${result.data.messages.length} tin nhắn`, 'success');
+                        }
+                    } else {
+                        showToast('Chào mừng', 'Hãy bắt đầu cuộc trò chuyện!', 'info');
+                    }
+                    
+                    // Focus on message input
+                    messageInput.focus();
+                } catch (error) {
+                    console.error('Error loading conversation:', error);
+                    showToast('Lỗi', 'Không thể tải cuộc trò chuyện', 'error');
+                }
+            } else if (urlParams.phoneNumber) {
+                // New conversation - show login form with phone pre-filled
+                currentPhoneNumber = urlParams.phoneNumber;
+                document.getElementById('phoneNumber').value = urlParams.phoneNumber;
+                loginSection.classList.remove('hidden');
+                chatSection.classList.add('hidden');
+                document.getElementById('firstQuestion').focus();
+            }
+        }
+
+        // Toast Notification
+        function showToast(title, message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastClose = document.getElementById('toastClose');
+
+            const icons = {
+                success: 'fas fa-check-circle text-green-500',
+                error: 'fas fa-exclamation-circle text-red-500',
+                info: 'fas fa-info-circle text-blue-500',
+                warning: 'fas fa-exclamation-triangle text-yellow-500'
+            };
+
+            const borderColors = {
+                success: 'border-green-500',
+                error: 'border-red-500',
+                info: 'border-blue-500',
+                warning: 'border-yellow-500'
+            };
+
+            toastIcon.className = icons[type] || icons.info;
+            toast.querySelector('.bg-white').className = `bg-white rounded-lg shadow-xl p-4 min-w-[300px] border-l-4 ${borderColors[type]}`;
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+
+            toast.classList.remove('hidden');
+
+            toastClose.onclick = () => toast.classList.add('hidden');
+
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 5000);
+        }
+
+        function renderMessageActions(actions = []) {
+            console.log('renderMessageActions called with:', actions);
+            
+            if (!Array.isArray(actions) || actions.length === 0) {
+                console.log('No actions or not array');
+                return '';
+            }
+
+            const actionButtons = actions
+                .filter(action => {
+                    const valid = action && action.type === 'link' && action.label && action.url;
+                    if (!valid) console.log('Filtered out action:', action);
+                    return valid;
+                })
+                .map(action => `
+                    <a
+                        href="${escapeHtml(action.url)}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold transition-colors"
+                    >
+                        <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>
+                        <span>${escapeHtml(action.label)}</span>
+                    </a>
+                `)
+                .join('');
+
+            if (!actionButtons) {
+                console.log('No valid action buttons after filtering');
+                return '';
+            }
+
+            const result = `<div class="mt-2 flex flex-wrap gap-2">${actionButtons}</div>`;
+            console.log('Rendered actions HTML:', result);
+            return result;
+        }
+
+        // Add Message to UI
+        function addMessage(content, role, context = null, incrementCount = true, actions = []) {
+            console.log('addMessage called:', { role, hasContent: !!content, hasContext: !!context, actionsCount: actions?.length || 0, actions });
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message flex ${role === 'human' ? 'justify-end' : 'justify-start'}`;
+
+            const isHuman = role === 'human';
+            const bgColor = isHuman ? 'bg-blue-600 text-white' : 'bg-white text-gray-800';
+            const alignClass = isHuman ? 'items-end' : 'items-start';
+            const renderedContent = DOMPurify.sanitize(marked.parse(content));
+            const actionsHtml = !isHuman ? renderMessageActions(actions) : '';
+
+            messageDiv.innerHTML = `
+                <div class="flex ${alignClass} space-x-2 max-w-[88%] sm:max-w-[78%] lg:max-w-[70%]">
+                    ${!isHuman ? '<div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-robot text-white text-sm"></i></div>' : ''}
+                    <div>
+                        <div class="${bgColor} rounded-2xl px-4 py-3 shadow-md">
+                            <div class="markdown-body text-sm">${renderedContent}</div>
+                            ${actionsHtml}
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1 px-2">${new Date().toLocaleTimeString('vi-VN')}</p>
+                        ${context && !isHuman ? `
+                            <button onclick="toggleContext(this)" class="text-xs text-blue-600 hover:text-blue-700 mt-1 px-2">
+                                <i class="fas fa-database mr-1"></i>Xem nguồn
+                            </button>
+                            <div class="context-info hidden mt-2 bg-gray-100 rounded-lg p-3 text-xs text-gray-600 max-w-full">
+                                <strong class="block mb-1 text-gray-700">Nguồn tham khảo:</strong>
+                                <div class="max-h-32 overflow-y-auto">${escapeHtml(context)}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${isHuman ? '<div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0"><i class="fas fa-user text-white text-sm"></i></div>' : ''}
+                </div>
+            `;
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            if (incrementCount) {
+                messageCount++;
+                messageCountDisplay.textContent = `${messageCount} tin nhắn`;
+            }
+        }
+
+        function createStreamingAssistantMessage() {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'chat-message flex justify-start';
+            messageDiv.innerHTML = `
+                <div class="flex items-start space-x-2 max-w-[88%] sm:max-w-[78%] lg:max-w-[70%]">
+                    <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-robot text-white text-sm"></i>
+                    </div>
+                    <div>
+                        <div class="bg-white text-gray-800 rounded-2xl px-4 py-3 shadow-md chat-box">
+                            <div class="markdown-body text-sm whitespace-pre-wrap" data-stream-content></div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1 px-2">${new Date().toLocaleTimeString('vi-VN')}</p>
+                    </div>
+                </div>
+            `;
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            messageCount++;
+            messageCountDisplay.textContent = `${messageCount} tin nhắn`;
+
+            const contentNode = messageDiv.querySelector('[data-stream-content]');
+            let rawText = '';
+            let pendingText = '';
+            let rafId = null;
+
+            function flushPending() {
+                if (!pendingText) return;
+                rawText += pendingText;
+                pendingText = '';
+                contentNode.textContent = rawText;
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+
+            function scheduleFlush() {
+                if (rafId !== null) return;
+                rafId = requestAnimationFrame(() => {
+                    rafId = null;
+                    flushPending();
+                });
+            }
+
+            return {
+                append(chunk) {
+                    if (!chunk) return;
+                    pendingText += chunk;
+                    scheduleFlush();
+                },
+                finalize(finalText, context = null, actions = []) {
+                    if (rafId !== null) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
+                    flushPending();
+
+                    if (typeof finalText === 'string' && finalText.length > 0) {
+                        rawText = finalText;
+                    }
+
+                    const renderedContent = DOMPurify.sanitize(marked.parse(rawText || ''));
+                    contentNode.classList.remove('whitespace-pre-wrap');
+                    contentNode.innerHTML = renderedContent;
+
+                    if (context) {
+                        const wrapper = messageDiv.querySelector('.text-xs.text-gray-400.mt-1.px-2');
+                        const contextBtn = document.createElement('button');
+                        contextBtn.className = 'text-xs text-blue-600 hover:text-blue-700 mt-1 px-2';
+                        contextBtn.innerHTML = '<i class="fas fa-database mr-1"></i>Xem nguồn';
+                        contextBtn.onclick = function() { toggleContext(contextBtn); };
+
+                        const contextInfo = document.createElement('div');
+                        contextInfo.className = 'context-info hidden mt-2 bg-gray-100 rounded-lg p-3 text-xs text-gray-600 max-w-full';
+                        contextInfo.innerHTML = `
+                            <strong class="block mb-1 text-gray-700">Nguồn tham khảo:</strong>
+                            <div class="max-h-32 overflow-y-auto">${escapeHtml(context)}</div>
+                        `;
+
+                        wrapper.parentElement.appendChild(contextBtn);
+                        wrapper.parentElement.appendChild(contextInfo);
+                    }
+
+                    if (Array.isArray(actions) && actions.length > 0) {
+                        const chatBox = messageDiv.querySelector('.chat-box');
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.innerHTML = renderMessageActions(actions);
+                        if (actionsDiv.firstElementChild && chatBox) {
+                            chatBox.appendChild(actionsDiv.firstElementChild);
+                        }
+                    }
+                },
+                fail(message = 'Không thể nhận phản hồi từ máy chủ') {
+                    if (rafId !== null) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
+                    contentNode.textContent = message;
+                }
+            };
+        }
+
+        async function streamChatResponse(url, payload, handlers = {}) {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                let errorMessage = 'Yêu cầu thất bại';
+                try {
+                    const err = await response.json();
+                    errorMessage = err.message || errorMessage;
+                } catch (e) {
+                    // Fallback to generic message when response is not JSON
+                }
+                throw new Error(errorMessage);
+            }
+
+            if (!response.body) {
+                throw new Error('Trình duyệt không hỗ trợ streaming');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed) continue;
+
+                    let event;
+                    try {
+                        event = JSON.parse(trimmed);
+                    } catch (error) {
+                        continue;
+                    }
+
+                    if (event.type === 'start' && handlers.onStart) {
+                        handlers.onStart(event);
+                    }
+                    if (event.type === 'chunk' && handlers.onChunk) {
+                        handlers.onChunk(event.chunk || '');
+                    }
+                    if (event.type === 'done' && handlers.onDone) {
+                        handlers.onDone(event.data);
+                    }
+                    if (event.type === 'error') {
+                        throw new Error(event.message || 'Lỗi khi stream phản hồi');
+                    }
+                }
+            }
+        }
+
+        // Toggle Context Display
+        window.toggleContext = function(btn) {
+            const contextInfo = btn.nextElementSibling;
+            if (contextInfo.classList.contains('hidden')) {
+                contextInfo.classList.remove('hidden');
+                btn.innerHTML = '<i class="fas fa-times mr-1"></i>Ẩn nguồn';
+            } else {
+                contextInfo.classList.add('hidden');
+                btn.innerHTML = '<i class="fas fa-database mr-1"></i>Xem nguồn';
+            }
+        };
+
+        // Show Typing Indicator
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typingIndicator';
+            typingDiv.className = 'chat-message flex justify-start';
+            typingDiv.innerHTML = `
+                <div class="flex items-start space-x-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+                        <i class="fas fa-robot text-white text-sm"></i>
+                    </div>
+                    <div class="bg-white rounded-2xl px-4 py-3 shadow-md">
+                        <div class="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(typingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const typingDiv = document.getElementById('typingIndicator');
+            if (typingDiv) {
+                typingDiv.remove();
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Start Conversation
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            const firstQuestion = document.getElementById('firstQuestion').value.trim();
+
+            if (!phoneNumber || !firstQuestion) {
+                showToast('Lỗi', 'Vui lòng điền đầy đủ thông tin', 'error');
+                return;
+            }
+
+            try {
+                loginForm.querySelector('button').disabled = true;
+                loginForm.querySelector('button').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Đang kết nối...';
+
+                const response = await fetch(`${API_BASE_URL}/chat/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber, question: firstQuestion })
+                });
+
+                const result = await response.json();
+                console.log('/chat/start response:', result);
+
+                if (result.success) {
+                    currentConversationId = result.data.conversationId || result.data.conversation?._id;
+                    currentPhoneNumber = phoneNumber;
+
+                    loginSection.classList.add('hidden');
+                    chatSection.classList.remove('hidden');
+                    userPhone.textContent = phoneNumber;
+                    conversationIdDisplay.textContent = currentConversationId;
+
+                    addMessage(firstQuestion, 'human');
+                    console.log('Actions from /chat/start:', result.data.actions);
+                    addMessage(result.data.answer, 'assistant', result.data.context, true, result.data.actions || []);
+
+                    messageInput.focus();
+                    showToast('Thành công', 'Đã bắt đầu cuộc trò chuyện', 'success');
+                } else {
+                    showToast('Lỗi', result.message || 'Không thể bắt đầu cuộc trò chuyện', 'error');
+                }
+            } catch (error) {
+                console.error('Error starting conversation:', error);
+                showToast('Lỗi', 'Không thể kết nối đến server', 'error');
+            } finally {
+                loginForm.querySelector('button').disabled = false;
+                loginForm.querySelector('button').innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Bắt đầu chat';
+            }
+        });
+
+        // Send Message
+        messageForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const question = messageInput.value.trim();
+            if (!question) return;
+
+            // Add user message immediately
+            addMessage(question, 'human');
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+
+            // Disable input
+            sendBtn.disabled = true;
+            messageInput.disabled = true;
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/chat/continue`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question, conversationId: currentConversationId })
+                });
+
+                const result = await response.json();
+                console.log('/chat/continue response:', result);
+
+                hideTypingIndicator();
+
+                if (result.success) {
+                    console.log('Actions from /chat/continue:', result.data.actions);
+                    addMessage(result.data.answer, 'assistant', result.data.context, true, result.data.actions || []);
+                } else {
+                    showToast('Lỗi', result.message || 'Không thể gửi tin nhắn', 'error');
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                console.error('Error sending message:', error);
+                showToast('Lỗi', 'Không thể kết nối đến server', 'error');
+            } finally {
+                sendBtn.disabled = false;
+                messageInput.disabled = false;
+                messageInput.focus();
+            }
+        });
+
+        // Auto-resize textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // New Chat Button
+        newChatBtn.addEventListener('click', () => {
+            if (confirm('Bạn có chắc muốn bắt đầu cuộc trò chuyện mới?')) {
+                // Redirect back to index
+                window.location.href = 'index.html';
+            }
+        });
+
+        // Keyboard shortcuts
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                messageForm.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            initializeFromURL();
+        });
+
+        console.log('🤖 AI Chat Assistant initialized');
+        console.log('📡 API Base URL:', API_BASE_URL);
+    </script>
+</body>
+</html>
